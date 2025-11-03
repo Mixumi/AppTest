@@ -13,55 +13,90 @@ struct NewBoarding3: View {
     private let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
     @Binding var step: Int
     private let center = AuthorizationCenter.shared   //familcontrols中心
-    
+
+    private let currentStepIndex = 3
+
+    @State private var isRequesting = false
+
     var body: some View {
-        ZStack {
-            NightSkyView()
-            VStack {
-                // 顶部数字
-                HStack(alignment: .lastTextBaseline) {
-                    Spacer()
-                    Text("如果你想改变，请授予LIMSTAR屏幕使用权限。")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundStyle(
-                            SpaceTheme.textPrimary
+        OnboardingScaffold(
+            currentStep: currentStepIndex,
+            step: $step,
+            isPrimaryButtonDisabled: isRequesting,
+            onPrimaryButtonTap: requestAuthorization,
+            skipAction: skipToFinal
+        ) {
+            VStack(spacing: 32) {
+                VStack(spacing: 16) {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [SpaceTheme.brandPrimary.opacity(0.8), Color.purple.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                        .lineSpacing(12)
+                        .frame(width: 140, height: 140)
+                        .overlay(
+                            Image(systemName: "shield.lefthalf.fill")
+                                .font(.system(size: 56, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.white)
+                        )
+                        .shadow(color: Color.black.opacity(0.35), radius: 18, x: 0, y: 10)
+
+                    Text("如果你想改变，请授予 LIMSTAR 屏幕使用权限。")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundStyle(SpaceTheme.textPrimary)
                         .multilineTextAlignment(.center)
-                    Spacer()
+                        .padding(.horizontal)
+
+                    Text("我们将根据你的使用数据生成专属的守护策略。数据始终由苹果加密保护。")
+                        .font(.system(size: 16, weight: .regular, design: .rounded))
+                        .foregroundStyle(SpaceTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
-                Spacer()
-                GeometryReader { geo in
-                    ZStack {
-                        PermissionAlertView()
-                            .onTapGesture {
-                                feedbackGenerator.impactOccurred()
-                                Task {
-                                    do {
-                                        try await center.requestAuthorization(for: FamilyControlsMember.individual)
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                            step += 1
-                                        }
-                                    } catch {
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                            step += 1
-                                        }
-                                    }
-                                }
-                            }
+
+                PermissionAlertView()
+                    .padding(.horizontal, 12)
+                    .onTapGesture {
+                        requestAuthorization()
                     }
-                }
-                Spacer()
+
                 Text("您的使用信息将100%被苹果保护，不会被泄露。")
-                    .font(.system(size: 16, weight: .regular, design: .rounded))
-                    .foregroundStyle(
-                        SpaceTheme.textPrimary.opacity(0.7)
-                    )
-                    .lineSpacing(12)
+                    .font(.system(size: 14, weight: .regular, design: .rounded))
+                    .foregroundStyle(SpaceTheme.textSecondary)
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
             }
-            .padding(.all , 16)
-            .frame(maxWidth: 500)
+            .frame(maxWidth: 560)
+        }
+    }
+
+    private func requestAuthorization() {
+        guard !isRequesting else { return }
+        feedbackGenerator.impactOccurred()
+        isRequesting = true
+        Task {
+            defer { isRequesting = false }
+            do {
+                try await center.requestAuthorization(for: FamilyControlsMember.individual)
+                proceedToNext()
+            } catch {
+                proceedToNext()
+            }
+        }
+    }
+
+    private func proceedToNext() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            step += 1
+        }
+    }
+
+    private func skipToFinal() {
+        withAnimation {
+            step = OnboardingConstants.lastStepIndex
         }
     }
 }
@@ -69,7 +104,6 @@ struct NewBoarding3: View {
 #Preview {
     NewBoarding3(step: .constant(0))
 }
-
 
 struct PermissionAlertView: View {
     let appName: String = NSLocalizedString("LIMSTAR", comment: "")
@@ -94,7 +128,7 @@ struct PermissionAlertView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
                     .padding(.bottom, 12)
-                    
+
                     Rectangle()
                         .frame(height: 1)
                         .foregroundColor(Color.secondary)
@@ -106,7 +140,7 @@ struct PermissionAlertView: View {
                         Rectangle()
                             .frame(width : 1 , height: 44)
                             .foregroundColor(Color.secondary)
-                        
+
                         Text("不允许")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .foregroundStyle(.blue)
@@ -116,24 +150,22 @@ struct PermissionAlertView: View {
                 .frame(width: 270)
                 .background(SpaceTheme.cardBackgroundPrimary)
                 .padding(.all , 16)
-                .cornerRadius(13)
+                .cornerRadius(20)
                 .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
                 .overlay(
-                    // 这里的 cornerRadius 要和上面保持一致
-                    RoundedRectangle(cornerRadius: 13)
-                        .stroke(Color.blue, lineWidth: 2)
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(SpaceTheme.brandPrimary.opacity(0.6), lineWidth: 2)
                 )
             }
             // 箭头
             CurvedArrow()
-                .stroke(Color.blue, lineWidth: 3)
+                .stroke(SpaceTheme.brandPrimary, lineWidth: 3)
                 .rotationEffect(.degrees(220))                     // 微调角度
                 .frame(width: 100, height: 100)    // 箭头的“画布”大小
                 .offset(x: -30, y: 120)             // 移动到“继续”按钮正下方
         }
     }
 }
-
 
 struct CurvedArrow: Shape {
     func path(in rect: CGRect) -> Path {
@@ -144,25 +176,22 @@ struct CurvedArrow: Shape {
         let end = CGPoint(x: rect.maxX, y: rect.midY)
         path.move(to: start)
         path.addQuadCurve(to: end, control: control)
-        
+
         // 2. 箭头头：在 end 点画两条短线
         let arrowHeadSize: CGFloat = 10
         let angle1 = atan2(end.y - control.y, end.x - control.x) + .pi / 6
         let angle2 = atan2(end.y - control.y, end.x - control.x) - .pi / 6
-        
+
         let p1 = CGPoint(x: end.x - cos(angle1) * arrowHeadSize,
                          y: end.y - sin(angle1) * arrowHeadSize)
         let p2 = CGPoint(x: end.x - cos(angle2) * arrowHeadSize,
                          y: end.y - sin(angle2) * arrowHeadSize)
-        
+
         path.move(to: end)
         path.addLine(to: p1)
         path.move(to: end)
         path.addLine(to: p2)
-        
+
         return path
     }
 }
-
-
-

@@ -11,8 +11,9 @@ struct NewBoarding2: View {
     private let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
     @Binding var step: Int
     @State private var currentPage: Int = 0
-    
-    
+
+    private let currentStepIndex = 2
+
     private let cards = [
         (
             NSLocalizedString("健康", comment: ""),
@@ -30,109 +31,85 @@ struct NewBoarding2: View {
             NSLocalizedString("每天陪伴家人30分钟，一年后你将拥有更加亲密的关系。", comment: "")
         )
     ]
-    
-    
+
     var body: some View {
-        ZStack {
-            NightSkyView()
-            VStack {
-                PageIndicator(currentPage: $currentPage)
-                Spacer()
-            }
-            .padding(.all , 16)
-            VStack {
-                Spacer()
-                HStack {
-                    // 分页TabView
-                    TabView(selection: $currentPage) {
-                        ForEach(0..<cards.count, id: \.self) { idx in
-                            CardView(title: cards[idx].0, imgName: cards[idx].1, desc: cards[idx].2)
-                                .tag(idx)
-                        }
-                    }
-                    // 隐藏系统自带的点
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+        OnboardingScaffold(
+            currentStep: currentStepIndex,
+            step: $step,
+            isPrimaryButtonDisabled: currentPage < cards.count - 1,
+            onPrimaryButtonTap: goNext,
+            skipAction: skipToFinal
+        ) {
+            VStack(spacing: 28) {
+                VStack(spacing: 12) {
+                    Text("探索减少使用手机后的三种可能宇宙")
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .foregroundStyle(SpaceTheme.textPrimary)
+                        .multilineTextAlignment(.center)
+
+                    Text("轻轻滑动星图，选择你最想先改变的方向。")
+                        .font(.system(size: 16, weight: .regular, design: .rounded))
+                        .foregroundStyle(SpaceTheme.textSecondary)
+                        .multilineTextAlignment(.center)
                 }
-                Spacer()
-            }
-            .frame(maxWidth: 500)
-            
-            
-            VStack {
-                Spacer()
-                if currentPage == 2 {
-                    HStack {
-                        Spacer()
-                        Button {
-                            feedbackGenerator.impactOccurred()
-                            step += 1
-                        } label: {
-                            HStack(spacing: 8) {
-                                Text("Continue")
-                                    .font(.system(size: 18, weight: .medium, design: .rounded))
-                                    .foregroundStyle(SpaceTheme.textPrimary)
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 18, weight: .medium, design: .rounded))
-                                    .foregroundStyle(SpaceTheme.textPrimary)
-                            }
-                            .padding(.vertical, 14)
-                            .padding(.horizontal, 24)
-                        }
+
+                TabView(selection: $currentPage) {
+                    ForEach(0..<cards.count, id: \.self) { idx in
+                        CardView(title: cards[idx].0, imgName: cards[idx].1, desc: cards[idx].2)
+                            .tag(idx)
+                            .padding(.horizontal, 8)
                     }
-                    
                 }
+                .frame(height: UIScreen.main.bounds.height * 0.48)
+                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+
+                CardCarouselIndicator(currentIndex: $currentPage, total: cards.count)
             }
-            .padding(.all , 16)
+            .frame(maxWidth: 560)
+            .padding(.top, 24)
         }
     }
-    
-    
-    
-    
+
+    private func goNext() {
+        feedbackGenerator.impactOccurred()
+        step += 1
+    }
+
+    private func skipToFinal() {
+        withAnimation {
+            step = OnboardingConstants.lastStepIndex
+        }
+    }
 }
 
+struct CardCarouselIndicator: View {
+    @Binding var currentIndex: Int
+    let total: Int
 
-struct PageIndicator: View {
-    /// 当前高亮的索引（0、1、2）
-    @Binding var currentPage: Int
-    
-    /// 总页数
-    let pageCount: Int = 3
-    
     var body: some View {
-        HStack(spacing: 12) {
-            ForEach(0..<pageCount, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 2)
-                // 选中页宽一点，不选中时半透明
-                    .frame(width: currentPage == index ? 30 : 20, height: 4)
-                    .foregroundColor(.gray)
-                    .opacity(currentPage == index ? 1 : 0.5)
-                // 加入动画效果
-                    .animation(.easeInOut(duration: 0.25), value: currentPage)
+        HStack(spacing: 10) {
+            ForEach(0..<total, id: \.self) { index in
+                Capsule()
+                    .fill(index == currentIndex ? SpaceTheme.accentGradient : LinearGradient(colors: [SpaceTheme.textSecondary.opacity(0.4)], startPoint: .leading, endPoint: .trailing))
+                    .frame(width: index == currentIndex ? 28 : 12, height: 4)
+                    .animation(.easeInOut(duration: 0.25), value: currentIndex)
             }
         }
-        // 顶部间距，可根据状态栏/导航栏高度微调
-        .padding(.top, 16)
+        .padding(.top, 8)
     }
 }
 
-
-#Preview {
-    NewBoarding2(step: .constant(0))
-}
-
-
-// 2. 你的卡片视图，可以按需求自定义样式
 struct CardView: View {
     let title: String
     let imgName: String
     let desc: String
+
     var body: some View {
-        VStack {
+        VStack(spacing: 16) {
             Text(title)
-                .font(.title)
-                .bold()
-            Spacer()
+                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                .foregroundStyle(SpaceTheme.textPrimary)
+
             GeometryReader { geo in
                 VStack {
                     Spacer()
@@ -142,34 +119,39 @@ struct CardView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(width: geo.size.width * 0.6)
+                            .shadow(color: Color.black.opacity(0.35), radius: 18, x: 0, y: 14)
                         Spacer()
                     }
                     Spacer()
                 }
             }
-            HStack {
-                Text(desc)
-                    .font(.system(size: 18, weight: .light, design: .rounded))
-                    .foregroundStyle(SpaceTheme.textPrimary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.horizontal , 16)
+
+            Text(desc)
+                .font(.system(size: 16, weight: .regular, design: .rounded))
+                .foregroundStyle(SpaceTheme.textPrimary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
         }
-        .padding()
-        .frame(height: UIScreen.main.bounds.height * 0.5)
-        .frame(maxWidth: .infinity)
-        .background( // 毛玻璃面板
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color(UIColor.systemBackground)) // 系统玻璃质感
-                .shadow(color: Color.white.opacity(0.2), radius: 10, x: 0, y: 0)  // 外光晕，让边缘发亮
-                .shadow(color: Color.black.opacity(0.2), radius: 10, x: 5, y: 5) // 投下的阴影，增加层次感
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(.white, lineWidth: 1.5)
-                }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(SpaceTheme.cardBackgroundPrimary)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(Color.white.opacity(0.22), lineWidth: 1.2)
+                )
         )
-        .cornerRadius(20)
-        .shadow(radius: 5)
-        .padding(.horizontal, 24)
+        .overlay(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .blur(radius: 1)
+        )
+        .shadow(color: Color.black.opacity(0.35), radius: 20, x: 0, y: 18)
+        .padding(.vertical, 8)
     }
+}
+
+#Preview {
+    NewBoarding2(step: .constant(0))
 }
