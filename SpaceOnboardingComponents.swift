@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct OnboardingConstants {
-    static let totalSteps: Int = 9
+    static let totalSteps: Int = 4
     static let lastStepIndex: Int = totalSteps - 1
 }
 
