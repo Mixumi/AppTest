@@ -11,72 +11,81 @@ import SwiftUI
 struct NewBoarding4: View {
     private let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
     @Binding var step: Int
-    
+
+    private let currentStepIndex = 4
+
+    @State private var isRequesting = false
+
     var body: some View {
-        ZStack {
-            NightSkyView()
-            VStack {
-                // 顶部数字
-                HStack(alignment: .lastTextBaseline) {
-                    Spacer()
-                    Text("LIMSTAR会在合适的时候给您发送通知，告知屏幕使用情况。")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundStyle(
-                            SpaceTheme.textPrimary
+        OnboardingScaffold(
+            currentStep: currentStepIndex,
+            step: $step,
+            isPrimaryButtonDisabled: isRequesting,
+            onPrimaryButtonTap: requestPermission,
+            skipAction: skipToFinal
+        ) {
+            VStack(spacing: 32) {
+                VStack(spacing: 16) {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.8), SpaceTheme.brandPrimary.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                        .lineSpacing(12)
+                        .frame(width: 140, height: 140)
+                        .overlay(
+                            Image(systemName: "bell.badge.waveform.fill")
+                                .font(.system(size: 56, weight: .medium, design: .rounded))
+                                .foregroundStyle(Color.white)
+                        )
+                        .shadow(color: Color.black.opacity(0.35), radius: 18, x: 0, y: 12)
+
+                    Text("LIMSTAR 会在合适的时机提醒你查看屏幕使用情况。")
+                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .foregroundStyle(SpaceTheme.textPrimary)
                         .multilineTextAlignment(.center)
-                    Spacer()
+                        .padding(.horizontal)
+
+                    Text("这些通知帮助你及时了解自己的使用状态，并给出下一步建议。")
+                        .font(.system(size: 16, weight: .regular, design: .rounded))
+                        .foregroundStyle(SpaceTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
-                Spacer()
-                GeometryReader { geo in
-                    ZStack {
-                        NotificationPermissionAlertView()
-                            .onTapGesture {
-                                feedbackGenerator.impactOccurred()
-                                Task {
-                                    do {
-                                        let settings = await UNUserNotificationCenter.current().notificationSettings()
-                                        if settings.authorizationStatus == .notDetermined {
-                                            _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
-                                            step += 1
-                                        } else {
-                                            step += 1
-                                        }
-                                    } catch {
-                                        step += 1
-                                    }
-                                }
-                            }
+
+                NotificationPermissionAlertView()
+                    .padding(.horizontal, 12)
+                    .onTapGesture {
+                        requestPermission()
                     }
-                }
-                Spacer()
-                
-                
             }
-            .padding(.all , 16)
-            .frame(maxWidth: 500)
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button {
-                        feedbackGenerator.impactOccurred()
-                        step += 1
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text("跳过")
-                                .font(.system(size: 18, weight: .medium, design: .rounded))
-                                .foregroundStyle(SpaceTheme.textPrimary)
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 18, weight: .medium, design: .rounded))
-                                .foregroundStyle(SpaceTheme.textPrimary)
-                        }
-                        .padding(.vertical, 14)
-                        .padding(.horizontal, 24)
-                    }
+            .frame(maxWidth: 560)
+        }
+    }
+
+    private func requestPermission() {
+        guard !isRequesting else { return }
+        feedbackGenerator.impactOccurred()
+        isRequesting = true
+        Task {
+            defer { isRequesting = false }
+            do {
+                let settings = await UNUserNotificationCenter.current().notificationSettings()
+                if settings.authorizationStatus == .notDetermined {
+                    _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
                 }
+                step += 1
+            } catch {
+                step += 1
             }
+        }
+    }
+
+    private func skipToFinal() {
+        withAnimation {
+            step = OnboardingConstants.lastStepIndex
         }
     }
 }
@@ -85,59 +94,50 @@ struct NewBoarding4: View {
     NewBoarding4(step: .constant(0))
 }
 
-
 struct NotificationPermissionAlertView: View {
     let appName: String = NSLocalizedString("LIMSTAR", comment: "")
     var body: some View {
         ZStack {
-            // 半透明遮罩
-            Color.black.opacity(0)
-                .ignoresSafeArea()
-            // 弹窗主体
-            ZStack {
-                VStack(spacing: 0) {
-                    VStack(spacing: 8) {
-                        // 标题
-                        Text("“\(appName)” 想给你发送通知")
-                            .font(.system(size: 20, weight: .semibold))
-                            .multilineTextAlignment(.center)
-                        // 说明
-                        Text("通知可能包括提醒、声音和图标标记。这些可以在\"设置\"中配置")
-                            .font(.system(size: 14))
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 12)
-                    
-                    Rectangle()
-                        .frame(height: 1)
-                        .foregroundColor(Color.secondary)
-                    // 底部按钮
-                    HStack(spacing: 0) {
-                        Text("不允许")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .foregroundStyle(.blue)
-                        Rectangle()
-                            .frame(width : 1 , height: 44)
-                            .foregroundColor(Color.secondary)
-                        Text("允许")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .foregroundStyle(.blue)
-                    }
-                    .frame(height: 44)
+            Color.clear
+            VStack(spacing: 0) {
+                VStack(spacing: 8) {
+                    Text("“\(appName)” 想给你发送通知")
+                        .font(.system(size: 20, weight: .semibold))
+                        .multilineTextAlignment(.center)
+                    Text("通知可能包括提醒、声音和图标标记。这些可以在“设置”中配置。")
+                        .font(.system(size: 14))
+                        .multilineTextAlignment(.center)
                 }
-                .frame(width: 270)
-                .background(SpaceTheme.cardBackgroundPrimary)
-                .padding(.all , 16)
-                .cornerRadius(13)
-                .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
-                .overlay(
-                    // 这里的 cornerRadius 要和上面保持一致
-                    RoundedRectangle(cornerRadius: 13)
-                        .stroke(Color.blue, lineWidth: 2)
-                )
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 12)
+
+                Rectangle()
+                    .frame(height: 1)
+                    .foregroundColor(Color.secondary)
+
+                HStack(spacing: 0) {
+                    Text("不允许")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .foregroundStyle(.blue)
+                    Rectangle()
+                        .frame(width : 1 , height: 44)
+                        .foregroundColor(Color.secondary)
+                    Text("允许")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .foregroundStyle(.blue)
+                }
+                .frame(height: 44)
             }
+            .frame(width: 270)
+            .background(SpaceTheme.cardBackgroundPrimary)
+            .padding(16)
+            .cornerRadius(20)
+            .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(SpaceTheme.brandPrimary.opacity(0.6), lineWidth: 2)
+            )
         }
     }
 }
